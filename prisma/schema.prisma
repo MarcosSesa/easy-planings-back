@@ -6,3 +6,102 @@ generator client {
 datasource db {
   provider = "postgresql"
 }
+
+// ENUMS
+
+enum TripRole {
+  OWNER
+  MEMBER
+}
+
+enum TripMemberStatus {
+  PENDING
+  ACCEPTED
+  REJECTED
+}
+
+// ----------------------------------
+
+model User {
+  id           Int           @id @default(autoincrement())
+  name         String
+  email        String        @unique
+  passwordHash String
+  createdAt    DateTime      @default(now())
+
+  tripsCreated Trip[]
+  tripMembers  TripMember[]
+  activities   Activity[]
+}
+
+model Trip {
+  id          Int           @id @default(autoincrement())
+  title       String
+  description String?
+  startDate   DateTime
+  endDate     DateTime
+  createdAt   DateTime      @default(now())
+
+  createdById Int
+  createdBy   User          @relation(fields: [createdById], references: [id], onDelete: Cascade)
+
+  members     TripMember[]
+  days        TripDay[]
+  activities  Activity[]
+
+  @@index([createdById])
+}
+
+model TripMember {
+  id        Int              @id @default(autoincrement())
+  role      TripRole         @default(MEMBER)
+  status    TripMemberStatus @default(PENDING)
+  invitedAt DateTime         @default(now())
+  joinedAt  DateTime?
+
+  tripId    Int
+  userId    Int
+
+  trip      Trip             @relation(fields: [tripId], references: [id], onDelete: Cascade)
+  user      User             @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([tripId, userId])
+  @@index([userId])
+  @@index([tripId])
+}
+
+model TripDay {
+  id         Int       @id @default(autoincrement())
+  date       DateTime
+  tripId     Int
+
+  trip       Trip      @relation(fields: [tripId], references: [id], onDelete: Cascade)
+  activities Activity[]
+
+  @@unique([tripId, date])
+  @@index([tripId])
+}
+
+model Activity {
+  id          Int       @id @default(autoincrement())
+  title       String
+  description String?
+  location    String?
+
+  startTime   DateTime?
+  endTime     DateTime?
+
+  createdAt   DateTime  @default(now())
+
+  tripId      Int
+  tripDayId   Int
+  createdById Int
+
+  trip        Trip      @relation(fields: [tripId], references: [id], onDelete: Cascade)
+  tripDay     TripDay   @relation(fields: [tripDayId], references: [id], onDelete: Cascade)
+  createdBy   User      @relation(fields: [createdById], references: [id])
+
+  @@index([tripId])
+  @@index([tripDayId])
+  @@index([createdById])
+}
