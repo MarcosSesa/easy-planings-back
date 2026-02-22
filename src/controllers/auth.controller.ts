@@ -1,33 +1,45 @@
-import { RequestHandler } from "express";
-import { z } from "zod";
+import {RequestHandler} from "express";
 import jwt from "jsonwebtoken";
-import bcrypt from "bcrypt";
-import { registerUserValidator } from "../validators/user/register";
-import { prisma } from "../services/prisma";
+import {registerUserValidator} from "../validators/user/register";
+import {createUser, findUser} from "src/services/auth.service";
+import {loginUserValidator} from "src/validators/user/login";
+import {compareHash, hash} from "src/services/bcrypt.service";
 
-export const registerUser: RequestHandler = async (req, res) => {
-  try {
-    const userData = registerUserValidator.parse(req.body);
-    const passwordHash = await bcrypt.hash(userData.password, 6);
-    const newUser = await prisma.user.create({
-      data: { name: userData.name, email: userData.email, passwordHash },
-    });
-    if (!process.env.TOKEN_SECRET) {
-      throw new Error("TOKEN_SECRET is not defined");
-    }
-    const token = jwt.sign({ user: newUser }, process.env.TOKEN_SECRET);
 
-    res
-      .status(201)
-      .json({ message: "User registered successfully", token: token });
-  } catch (error) {
-    if (error instanceof z.ZodError) {
-      return res.status(400).json({
-        message: "Validation failed at register new user",
-        errors: error.issues.map((issue) => issue.message),
-      });
+export const registerUser: RequestHandler = async (req, res, next) => {
+    try {
+        const userData = registerUserValidator.parse(req.body);
+        const passwordHash = await hash(userData.password);
+        const newUser = await createUser(userData.name, userData.email, passwordHash);
+
+        if (!process.env.TOKEN_SECRET) throw new Error("TOKEN_SECRET is not defined");
+
+        const token = jwt.sign({user: newUser}, process.env.TOKEN_SECRET);
+
+        return res.status(201).json({message: "User registered successfully", token: token});
+
+    } catch (error) {
+        next(error);
     }
-  }
 };
 
-export const loginUser: RequestHandler = async (req, res) => {};
+export const loginUser: RequestHandler = async (req, res, next) => {
+    try {
+        const loginData = loginUserValidator.parse(req.body);
+        const user = await findUser(loginData.email)
+
+        if (!user) return res.status(401).json({message: "Email o contraseña incorrectos"});
+
+        const isValid = compareHash(loginData.password, user.passwordHash);
+
+        if (!isValid) return res.status(401).json({message: "Email o contraseña incorrectos"});
+
+        if (!process.env.TOKEN_SECRET) throw new Error("TOKEN_SECRET no definido");
+
+        const token = jwt.sign({userId: user.id, email: user.email}, process.env.TOKEN_SECRET);
+
+        res.status(200).json({message: "Login exitoso", token,});
+    } catch (error) {
+        next(error);
+    }
+};
