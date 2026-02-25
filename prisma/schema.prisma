@@ -23,11 +23,11 @@ enum TripMemberStatus {
 // ----------------------------------
 
 model User {
-  id           Int           @id @default(autoincrement())
+  id           String   @id @default(uuid())
   name         String
-  email        String        @unique
+  email        String   @unique
   passwordHash String
-  createdAt    DateTime      @default(now())
+  createdAt    DateTime @default(now())
 
   tripsCreated Trip[]
   tripMembers  TripMember[]
@@ -35,35 +35,35 @@ model User {
 }
 
 model Trip {
-  id          Int           @id @default(autoincrement())
+  id          String   @id @default(uuid())
   title       String
   description String?
   startDate   DateTime
   endDate     DateTime
-  createdAt   DateTime      @default(now())
+  createdAt   DateTime @default(now())
 
-  createdById Int
-  createdBy   User          @relation(fields: [createdById], references: [id], onDelete: Cascade)
+  createdById String
+  createdBy   User   @relation(fields: [createdById], references: [id], onDelete: Cascade)
 
-  members     TripMember[]
-  days        TripDay[]
-  activities  Activity[]
+  members    TripMember[]
+  days       TripDay[]
+  activities Activity[]
 
   @@index([createdById])
 }
 
 model TripMember {
-  id        Int              @id @default(autoincrement())
+  id        String           @id @default(uuid())
   role      TripRole         @default(MEMBER)
   status    TripMemberStatus @default(PENDING)
   invitedAt DateTime         @default(now())
   joinedAt  DateTime?
 
-  tripId    Int
-  userId    Int
+  tripId String
+  userId String
 
-  trip      Trip             @relation(fields: [tripId], references: [id], onDelete: Cascade)
-  user      User             @relation(fields: [userId], references: [id], onDelete: Cascade)
+  trip Trip @relation(fields: [tripId], references: [id], onDelete: Cascade)
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
 
   @@unique([tripId, userId])
   @@index([userId])
@@ -71,11 +71,11 @@ model TripMember {
 }
 
 model TripDay {
-  id         Int       @id @default(autoincrement())
-  date       DateTime
-  tripId     Int
+  id     String   @id @default(uuid())
+  date   DateTime
+  tripId String
 
-  trip       Trip      @relation(fields: [tripId], references: [id], onDelete: Cascade)
+  trip       Trip       @relation(fields: [tripId], references: [id], onDelete: Cascade)
   activities Activity[]
 
   @@unique([tripId, date])
@@ -83,23 +83,23 @@ model TripDay {
 }
 
 model Activity {
-  id          Int       @id @default(autoincrement())
+  id          String  @id @default(uuid())
   title       String
   description String?
   location    String?
 
-  startTime   DateTime?
-  endTime     DateTime?
+  startTime DateTime?
+  endTime   DateTime?
 
-  createdAt   DateTime  @default(now())
+  createdAt DateTime @default(now())
 
-  tripId      Int
-  tripDayId   Int
-  createdById Int
+  tripId      String
+  tripDayId   String
+  createdById String
 
-  trip        Trip      @relation(fields: [tripId], references: [id], onDelete: Cascade)
-  tripDay     TripDay   @relation(fields: [tripDayId], references: [id], onDelete: Cascade)
-  createdBy   User      @relation(fields: [createdById], references: [id])
+  trip      Trip    @relation(fields: [tripId], references: [id], onDelete: Cascade)
+  tripDay   TripDay @relation(fields: [tripDayId], references: [id], onDelete: Cascade)
+  createdBy User    @relation(fields: [createdById], references: [id])
 
   @@index([tripId])
   @@index([tripDayId])

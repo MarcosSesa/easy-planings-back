@@ -8,7 +8,7 @@ export const zodErrorHandler: ErrorRequestHandler = (
     next
 ) => {
     if (error instanceof ZodError) {
-        res.status(400).json({message: error.issues[0].message});
+       return  res.status(400).json({message: error.issues[0].message});
     } else {
         next(error);
     }
