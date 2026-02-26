@@ -62,18 +62,29 @@ export const deleteTrip = async (tripId: string, userId: string) => {
     return prismaService.trip.delete({where: {id: tripId}});
 }
 
-export const updateTrip = async (tripData: TripData, tripId: string) => {
-    return prismaService.trip.update({
-        where: {id: tripId,},
+export const updateTrip = async (tripData: TripData, tripId: string, userId: string) => {
+    const trip = await prismaService.trip.findUnique({where: { id: tripId },});
+
+    if (!trip) throw new CustomError("Trip not found", 404);
+
+    const membership = await prismaService.tripMember.findUnique({
+        where: {tripId_userId: { tripId, userId },},
+        select: { role: true, status: true },
+    });
+
+    if (!membership || membership.status !== "ACCEPTED") throw new CustomError("You are not a member of this trip", 401);
+
+
+    return  prismaService.trip.update({
+        where: {id: tripId},
         data: {
             title: tripData.title,
             description: tripData.description,
             startDate: tripData.startDate,
             endDate: tripData.endDate,
-        }
-    })
-
-}
+        },
+    });
+};
 
 export const getTripsList = async (userId: string) => {
     return prismaService.trip.findMany({where: {members: {some: {userId: userId, status: "ACCEPTED"}}}})

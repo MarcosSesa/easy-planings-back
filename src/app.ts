@@ -5,7 +5,7 @@ import {zodErrorHandler} from "src/handlers/zod-error.handler";
 import {globalErrorHandler} from "src/handlers/global-error.handler";
 import {tripRouter} from "src/routes/trip.routes";
 import {jwtErrorHandler} from "src/handlers/jwt-error.handler";
-import {tripMemberRouter} from "src/routes/trip-member.routes";
+import {memberRouter} from "src/routes/member.routes";
 
 const app = express();
 
@@ -14,7 +14,7 @@ app.use(cors());
 
 app.use("/auth", authRouter);
 app.use("/trip", tripRouter);
-app.use("/members", tripMemberRouter);
+app.use("/members", memberRouter);
 
 
 app.use(zodErrorHandler);
