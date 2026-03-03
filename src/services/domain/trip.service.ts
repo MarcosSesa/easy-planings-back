@@ -37,11 +37,12 @@ export const createTrip = async (tripData: TripData, userId: string) => {
 
         while (currentDate <= endDate) {
             days.push({
-                date: currentDate,
+                date: new Date(currentDate),
                 tripId: trip.id,
             });
             currentDate.setDate(currentDate.getDate() + 1);
         }
+        console.log(days)
 
         await tx.tripDay.createMany({
             data: days,
@@ -99,8 +100,7 @@ export const getTripById = async (tripId: string, userId: string) => {
 
     const membership = trip.members.find((member) => member.userId === userId && member.status === "ACCEPTED");
 
-    if (!membership) { throw new CustomError("Only the creator or a member of the trip can see it", 401);}
+    if (!membership) { throw new CustomError("Only the members of the trip can see it", 401);}
 
-
-    return prismaService.trip.findMany({where: {members: {some: {userId: userId}}}})
+    return trip;
 }
