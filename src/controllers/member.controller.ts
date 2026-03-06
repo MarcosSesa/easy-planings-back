@@ -7,18 +7,18 @@ export const createMemberController: RequestHandler = async (req, res) => {
     const userId = req.user!.id;
     const body = crateMemberValidator.parse(req.body)
     const createdMember = await createMember(userId, body.email, body.tripId)
-    return res.status(201).json(createdMember);
+    return res.status(201).json({message: 'Successfully created member', data: createdMember});
 }
 
 export const acceptMembershipController: RequestHandler = async (req, res) => {
     const userId = req.user!.id
     const body = acceptMemberValidator.parse(req.body)
     const acceptedMember = await acceptMember(userId, body.memberId, body.status)
-    return res.status(200).json(acceptedMember);
+    return res.status(200).json({message: 'Successfully accepted membership', data: acceptedMember});
 }
 
 export const listPendingMembershipController: RequestHandler = async (req, res) => {
     const userId = req.user!.id
     const invitations = await listPendingMembers(userId)
-    return res.status(200).json(invitations);
+    return res.status(200).json({message: 'OK', data: invitations});
 }

@@ -13,7 +13,7 @@ export const registerUser: RequestHandler = async (req, res, next) => {
 
     const token = sign({userId: newUser.id, email: newUser.email});
 
-    return res.status(201).json({message: "User registered successfully", token: token});
+    return res.status(201).json({message: "User registered successfully", data: token});
 };
 
 export const loginUser: RequestHandler = async (req, res, next) => {
@@ -28,5 +28,5 @@ export const loginUser: RequestHandler = async (req, res, next) => {
     
     const token = sign({userId: user.id, email: user.email});
 
-    return res.status(200).json({message: "Login successful", token,});
+    return res.status(200).json({message: "Login successful", data:token});
 };

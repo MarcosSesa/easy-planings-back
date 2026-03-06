@@ -7,7 +7,7 @@ export const getTripDaysByTripIdController: RequestHandler = async (req, res) =>
     const params = getTripDaysByIdParamValidator.parse(req.params);
     const userId = req.user!.id;
     const tripDays = await getTripDaysByTripId(userId, params.tripId);
-    return res.status(200).json(tripDays)
+    return res.status(200).json({message: 'OK' , data: tripDays})
 }
 
 
@@ -15,5 +15,5 @@ export const getTripDayByIdController: RequestHandler = async (req, res) => {
     const params = getTripDayByIdParamValidator.parse(req.params);
     const userId = req.user!.id;
     const tripDay = await getTripDayById(userId, params.tripId, params.id);
-    return res.status(200).json(tripDay)
+    return res.status(200).json({message: 'OK' , data: tripDay})
 }

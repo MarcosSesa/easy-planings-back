@@ -11,7 +11,7 @@ export const createTripController: RequestHandler = async (req, res) => {
     if(tripData.endDate < tripData.startDate)return res.status(400).send({error: "Invalid date format, startDate cannot be lower than endDate"});
     const tripCreated = await createTrip(tripData, userId);
 
-    return res.status(201).json({message: "Trip successfully created", tripCreated});
+    return res.status(201).json({message: "Trip successfully created", data: tripCreated});
 }
 
 export const deleteTripController: RequestHandler = async (req, res) => {
@@ -20,7 +20,7 @@ export const deleteTripController: RequestHandler = async (req, res) => {
 
     const deleted = await deleteTrip(tripId, userId);
 
-    return res.status(200).json({message: "Trip successfully deleted", deleted});
+    return res.status(200).json({message: "Trip successfully deleted", data: deleted});
 }
 
 export const updateTripController: RequestHandler = async (req, res) => {
@@ -30,13 +30,13 @@ export const updateTripController: RequestHandler = async (req, res) => {
 
     const updated = await updateTrip(tripData, tripId, userId);
 
-    return res.status(200).json({message: "Trip successfully updated", updated});
+    return res.status(200).json({message: "Trip successfully updated", data: updated});
 }
 
 export const getTripsController: RequestHandler = async (req, res) => {
     const userId = req.user!.id;
     const userTrips = await getTripsList(userId)
-    return res.status(200).json({trips: userTrips});
+    return res.status(200).json({message: 'Ok',data: userTrips});
 }
 
 export const getTripByIdController: RequestHandler = async (req, res) => {
@@ -45,6 +45,6 @@ export const getTripByIdController: RequestHandler = async (req, res) => {
 
     const trip = await getTripById(tripId,userId)
 
-    return res.status(200).json({trip: trip});
+    return res.status(200).json({message: 'Ok',data:  trip});
 
 }
