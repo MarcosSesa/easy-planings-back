@@ -11,7 +11,7 @@ export const registerUser: RequestHandler = async (req, res, next) => {
     const passwordHash = await hash(userData.password);
     const newUser = await createUser(userData.name, userData.email, passwordHash);
 
-    const token = sign({userId: newUser.id, email: newUser.email});
+    const token = sign({username: newUser.name,userId: newUser.id, email: newUser.email});
 
     return res.status(201).json({message: "User registered successfully", data: token});
 };
@@ -22,11 +22,11 @@ export const loginUser: RequestHandler = async (req, res, next) => {
 
     if (!user) return res.status(401).json({message: "Email or password are incorrect, please try again"});
 
-    const isValid = compareHash(loginData.password, user.passwordHash);
+    const isValid = await compareHash(loginData.password, user.passwordHash);
 
     if (!isValid) return res.status(401).json({message: "Passwords do not match, please try again"});
     
-    const token = sign({userId: user.id, email: user.email});
+    const token = sign({username: user.name,userId: user.id, email: user.email});
 
     return res.status(200).json({message: "Login successful", data:token});
 };

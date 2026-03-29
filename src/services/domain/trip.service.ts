@@ -87,8 +87,31 @@ export const updateTrip = async (tripData: TripData, tripId: string, userId: str
     });
 };
 
-export const getTripsList = async (userId: string) => {
-    return prismaService.trip.findMany({where: {members: {some: {userId: userId, status: "ACCEPTED"}}}})
+export const getTripsList = async (userId: string, filter?: "past" | "current" | "future") => {
+    const now = new Date();
+
+    const whereClause: {
+        members: { some: { userId: string; status: "ACCEPTED" } };
+        startDate?: { gt?: Date; lte?: Date };
+        endDate?: { gte?: Date; lt?: Date };
+    } = {
+        members: {some: {userId: userId, status: "ACCEPTED"}}
+    };
+
+    if (filter === "past") {
+        whereClause.endDate = {lt: now};
+    }
+
+    if (filter === "future") {
+        whereClause.startDate = {gt: now};
+    }
+
+    if (filter === "current") {
+        whereClause.startDate = {lte: now};
+        whereClause.endDate = {gte: now};
+    }
+
+    return prismaService.trip.findMany({where: whereClause})
 }
 
 export const getTripById = async (tripId: string, userId: string) => {

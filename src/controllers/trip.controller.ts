@@ -3,6 +3,7 @@ import {crateTripValidator} from "src/validators/trip/create-trip";
 import {createTrip, deleteTrip, getTripById, getTripsList, updateTrip} from "src/services/domain/trip.service";
 import {deleteTripValidator} from "src/validators/trip/delete-trip";
 import {updateTripBodyValidator, updateTripParamValidator} from "src/validators/trip/update-trip";
+import {getTripsQueryValidator} from "src/validators/trip/get-trips";
 
 export const createTripController: RequestHandler = async (req, res) => {
     const userId = req.user!.id;
@@ -35,7 +36,8 @@ export const updateTripController: RequestHandler = async (req, res) => {
 
 export const getTripsController: RequestHandler = async (req, res) => {
     const userId = req.user!.id;
-    const userTrips = await getTripsList(userId)
+    const filter = getTripsQueryValidator.parse(req.query).filter;
+    const userTrips = await getTripsList(userId, filter)
     return res.status(200).json({message: 'Ok',data: userTrips});
 }
 
