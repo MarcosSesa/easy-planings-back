@@ -1,0 +1,1237 @@
+openapi: 3.0.3
+info:
+  title: Easy Planings Back API
+  version: 1.0.0
+  description: |
+    A comprehensive API for managing group travel plans with real-time collaboration.
+
+    ## Features
+    - User authentication with JWT tokens
+    - Create and manage trips with multiple members
+    - Organize trips by days and activities
+    - Invite other users to join your trips
+    - Role-based access control (Owner/Member)
+
+    ## Getting Started
+    1. Register a new account using `/auth/register`
+    2. Login to receive a JWT token using `/auth/login`
+    3. Include the token in the `Authorization: Bearer <token>` header for protected endpoints
+
+    ## Error Handling
+    All error responses follow a consistent format with descriptive messages and error codes.
+  contact:
+    name: Easy Planings Support
+    email: support@easyplanings.com
+  license:
+    name: ISC
+servers:
+  - url: http://localhost:3000
+    description: Local development server
+  - url: https://api.easyplanings.com
+    description: Production server (when deployed)
+tags:
+  - name: Auth
+    description: Authentication endpoints for user registration and login
+  - name: Trips
+    description: Endpoints for managing trips
+  - name: Members
+    description: Endpoints for managing trip memberships and invitations
+  - name: Trip Days
+    description: Endpoints for retrieving trip days and their activities
+  - name: Activities
+    description: Endpoints for managing activities within trip days
+security:
+  - bearerAuth: []
+paths:
+  /auth/register:
+    post:
+      tags: [Auth]
+      summary: Register a new user account
+      operationId: registerUser
+      description: Creates a new user account. Password must be at least 8 characters long.
+      security: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/RegisterRequest"
+            examples:
+              success:
+                summary: Valid registration
+                value:
+                  name: John Doe
+                  email: john@example.com
+                  password: SecurePassword123
+      responses:
+        "201":
+          description: User registered successfully
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/AuthSuccessResponse"
+              examples:
+                success:
+                  summary: Successful registration response
+                  value:
+                    message: "User registered successfully"
+                    data: "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9..."
+        "400":
+          $ref: "#/components/responses/ValidationError"
+        "500":
+          $ref: "#/components/responses/InternalServerError"
+
+  /auth/login:
+    post:
+      tags: [Auth]
+      summary: Login with email and password
+      operationId: loginUser
+      description: Authenticates a user and returns a JWT token valid for 7 days.
+      security: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/LoginRequest"
+            examples:
+              success:
+                summary: Valid login credentials
+                value:
+                  email: "john@example.com"
+                  password: "SecurePassword123"
+      responses:
+        "200":
+          description: Login successful
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/AuthSuccessResponse"
+              examples:
+                success:
+                  summary: Successful login response
+                  value:
+                    message: "Login successful"
+                    data: "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9..."
+        "400":
+          $ref: "#/components/responses/ValidationError"
+        "401":
+          description: Invalid credentials
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/MessageOnlyResponse"
+        "500":
+          $ref: "#/components/responses/InternalServerError"
+
+  /trip/create:
+    post:
+      tags: [Trips]
+      summary: Create a new trip
+      operationId: createTrip
+      description: Creates a new trip. The authenticated user becomes the trip owner. Start date must be before end date.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/CreateTripRequest"
+      responses:
+        "201":
+          description: Trip successfully created
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/TripResponse"
+        "400":
+          description: Invalid input or date range
+          content:
+            application/json:
+              schema:
+                oneOf:
+                  - $ref: "#/components/schemas/ValidationErrorBody"
+                  - $ref: "#/components/schemas/MessageOnlyResponse"
+        "401":
+          $ref: "#/components/responses/UnauthorizedError"
+        "500":
+          $ref: "#/components/responses/InternalServerError"
+
+  /trip/delete/{id}:
+    delete:
+      tags: [Trips]
+      summary: Delete a trip by ID
+      operationId: deleteTrip
+      description: Deletes a trip permanently. Only the trip owner can delete a trip. All associated data (members, days, activities) will be deleted.
+      parameters:
+        - $ref: "#/components/parameters/TripIdAsIdPathParam"
+      responses:
+        "200":
+          description: Trip successfully deleted
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/TripResponse"
+        "400":
+          description: Validation error or unknown trip id
+          content:
+            application/json:
+              schema:
+                oneOf:
+                  - $ref: "#/components/schemas/ValidationErrorBody"
+                  - $ref: "#/components/schemas/CustomErrorBody"
+        "401":
+          description: Unauthorized or not owner
+          content:
+            application/json:
+              schema:
+                oneOf:
+                  - $ref: "#/components/schemas/UnauthorizedErrorBody"
+                  - $ref: "#/components/schemas/CustomErrorBody"
+        "500":
+          $ref: "#/components/responses/InternalServerError"
+
+  /trip/update/{id}:
+    put:
+      tags: [Trips]
+      summary: Update trip details by ID
+      operationId: updateTrip
+      description: Updates trip information. Only trip members can update trip details.
+      parameters:
+        - $ref: "#/components/parameters/TripIdAsIdPathParam"
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/UpdateTripRequest"
+      responses:
+        "200":
+          description: Trip successfully updated
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/TripResponse"
+        "400":
+          description: Validation error
+          content:
+            application/json:
+              schema:
+                oneOf:
+                  - $ref: "#/components/schemas/ValidationErrorBody"
+                  - $ref: "#/components/schemas/CustomErrorBody"
+        "401":
+          description: Unauthorized or not a member
+          content:
+            application/json:
+              schema:
+                oneOf:
+                  - $ref: "#/components/schemas/UnauthorizedErrorBody"
+                  - $ref: "#/components/schemas/CustomErrorBody"
+        "404":
+          description: Trip not found
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/CustomErrorBody"
+        "500":
+          $ref: "#/components/responses/InternalServerError"
+
+  /trip/trips:
+    get:
+      tags: [Trips]
+      summary: List user trips
+      operationId: getUserTrips
+      description: Retrieves all trips the authenticated user is a member of, with optional filtering by status.
+      parameters:
+        - $ref: "#/components/parameters/TripFilterQueryParam"
+      responses:
+        "200":
+          description: Trips list
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/TripsListResponse"
+        "400":
+          $ref: "#/components/responses/ValidationError"
+        "401":
+          $ref: "#/components/responses/UnauthorizedError"
+        "500":
+          $ref: "#/components/responses/InternalServerError"
+
+  /trip/{id}:
+    get:
+      tags: [Trips]
+      summary: Get trip details by ID
+      operationId: getTripById
+      description: Retrieves detailed information about a specific trip including all members.
+      parameters:
+        - $ref: "#/components/parameters/TripIdAsIdPathParam"
+      responses:
+        "200":
+          description: Trip details with members
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/TripWithMembersResponse"
+        "400":
+          description: Validation error or unknown trip id
+          content:
+            application/json:
+              schema:
+                oneOf:
+                  - $ref: "#/components/schemas/ValidationErrorBody"
+                  - $ref: "#/components/schemas/CustomErrorBody"
+        "401":
+          description: Unauthorized or not a trip member
+          content:
+            application/json:
+              schema:
+                oneOf:
+                  - $ref: "#/components/schemas/UnauthorizedErrorBody"
+                  - $ref: "#/components/schemas/CustomErrorBody"
+        "500":
+          $ref: "#/components/responses/InternalServerError"
+
+  /members/create:
+    post:
+      tags: [Members]
+      summary: Invite a member to a trip
+      operationId: inviteMember
+      description: Sends an invitation to a user to join a trip. Only the trip owner can invite members.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/CreateMemberRequest"
+      responses:
+        "201":
+          description: Member invitation created
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/TripMemberResponse"
+        "400":
+          description: Validation error or invalid invite request
+          content:
+            application/json:
+              schema:
+                oneOf:
+                  - $ref: "#/components/schemas/ValidationErrorBody"
+                  - $ref: "#/components/schemas/CustomErrorBody"
+        "401":
+          description: Unauthorized or not trip owner
+          content:
+            application/json:
+              schema:
+                oneOf:
+                  - $ref: "#/components/schemas/UnauthorizedErrorBody"
+                  - $ref: "#/components/schemas/CustomErrorBody"
+        "404":
+          description: Trip or invited user not found
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/CustomErrorBody"
+        "409":
+          description: User already a member
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/CustomErrorBody"
+        "500":
+          $ref: "#/components/responses/InternalServerError"
+
+  /members/resolve-membership:
+    put:
+      tags: [Members]
+      summary: Accept or reject a trip invitation
+      operationId: resolveMembership
+      description: Accept or reject a pending trip invitation. The invited user can use this to respond to invitations.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/AcceptMemberRequest"
+      responses:
+        "200":
+          description: Membership updated
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/TripMemberResponse"
+        "400":
+          $ref: "#/components/responses/ValidationError"
+        "401":
+          description: Unauthorized or invitation owner mismatch
+          content:
+            application/json:
+              schema:
+                oneOf:
+                  - $ref: "#/components/schemas/UnauthorizedErrorBody"
+                  - $ref: "#/components/schemas/CustomErrorBody"
+        "404":
+          description: Member invitation not found
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/CustomErrorBody"
+        "409":
+          description: Invitation already resolved
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/CustomErrorBody"
+        "500":
+          $ref: "#/components/responses/InternalServerError"
+
+  /members/invitations:
+    get:
+      tags: [Members]
+      summary: List pending invitations for current user
+      operationId: getPendingInvitations
+      description: Retrieves all pending trip invitations for the authenticated user.
+      responses:
+        "200":
+          description: Pending invitations list
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/PendingInvitationsResponse"
+        "401":
+          $ref: "#/components/responses/UnauthorizedError"
+        "500":
+          $ref: "#/components/responses/InternalServerError"
+
+  /{tripId}/days:
+    get:
+      tags: [Trip Days]
+      summary: Get all days for a trip
+      operationId: getTripDays
+      description: Retrieves all days in a trip along with their activities. Returns trip days sorted by date.
+      parameters:
+        - $ref: "#/components/parameters/TripIdPathParam"
+      responses:
+        "200":
+          description: Trip days with activities
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/TripDaysListResponse"
+        "400":
+          $ref: "#/components/responses/ValidationError"
+        "401":
+          description: Unauthorized or not a trip member
+          content:
+            application/json:
+              schema:
+                oneOf:
+                  - $ref: "#/components/schemas/UnauthorizedErrorBody"
+                  - $ref: "#/components/schemas/CustomErrorBody"
+        "500":
+          $ref: "#/components/responses/InternalServerError"
+
+  /{tripId}/days/{id}:
+    get:
+      tags: [Trip Days]
+      summary: Get a trip day by ID
+      operationId: getTripDayById
+      description: Retrieves details of a specific trip day including all its activities.
+      parameters:
+        - $ref: "#/components/parameters/TripIdPathParam"
+        - $ref: "#/components/parameters/DayIdAsIdPathParam"
+      responses:
+        "200":
+          description: Trip day details
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/TripDayResponse"
+        "400":
+          $ref: "#/components/responses/ValidationError"
+        "401":
+          description: Unauthorized or not a trip member
+          content:
+            application/json:
+              schema:
+                oneOf:
+                  - $ref: "#/components/schemas/UnauthorizedErrorBody"
+                  - $ref: "#/components/schemas/CustomErrorBody"
+        "500":
+          $ref: "#/components/responses/InternalServerError"
+
+  /{tripId}/days/{dayId}/activities/update-activities:
+    post:
+      tags: [Activities]
+      summary: Create and/or update activities for a trip day
+      operationId: updateActivities
+      description: |
+        Create new activities or update existing ones for a specific trip day.
+
+        - To create a new activity, omit the `activityId` field
+        - To update an existing activity, include its `activityId`
+        - Both creation and update can be mixed in a single request
+      parameters:
+        - $ref: "#/components/parameters/TripIdPathParam"
+        - $ref: "#/components/parameters/DayIdPathParam"
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/UpdateActivitiesRequest"
+      responses:
+        "200":
+          description: Activities update summary
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/UpdateActivitiesResponse"
+        "400":
+          $ref: "#/components/responses/ValidationError"
+        "401":
+          description: Unauthorized or not a trip member
+          content:
+            application/json:
+              schema:
+                oneOf:
+                  - $ref: "#/components/schemas/UnauthorizedErrorBody"
+                  - $ref: "#/components/schemas/CustomErrorBody"
+        "404":
+          description: Trip or day not found
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/CustomErrorBody"
+        "500":
+          $ref: "#/components/responses/InternalServerError"
+
+  /{tripId}/days/{dayId}/activities/{activityId}/delete-activity:
+    delete:
+      tags: [Activities]
+      summary: Delete an activity from a trip day
+      operationId: deleteActivity
+      description: Deletes a specific activity from a trip day. Only trip members can delete activities.
+      parameters:
+        - $ref: "#/components/parameters/TripIdPathParam"
+        - $ref: "#/components/parameters/DayIdPathParam"
+        - $ref: "#/components/parameters/ActivityIdPathParam"
+      responses:
+        "200":
+          description: Activity deleted
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ActivityResponse"
+        "400":
+          $ref: "#/components/responses/ValidationError"
+        "401":
+          description: Unauthorized or not a trip member
+          content:
+            application/json:
+              schema:
+                oneOf:
+                  - $ref: "#/components/schemas/UnauthorizedErrorBody"
+                  - $ref: "#/components/schemas/CustomErrorBody"
+        "404":
+          description: Trip or day not found
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/CustomErrorBody"
+        "500":
+          $ref: "#/components/responses/InternalServerError"
+
+components:
+  securitySchemes:
+    bearerAuth:
+      type: http
+      scheme: bearer
+      bearerFormat: JWT
+      description: |
+        JWT Bearer token authentication. 
+
+        Get a token by logging in with `/auth/login` endpoint.
+        Include the token in the Authorization header as: `Authorization: Bearer <your_token_here>`
+
+        Tokens are valid for 7 days.
+
+  parameters:
+    TripIdAsIdPathParam:
+      name: id
+      in: path
+      required: true
+      description: Trip unique identifier (UUID)
+      schema:
+        type: string
+        format: uuid
+        example: "550e8400-e29b-41d4-a716-446655440000"
+    TripIdPathParam:
+      name: tripId
+      in: path
+      required: true
+      description: Trip unique identifier (UUID)
+      schema:
+        type: string
+        format: uuid
+        example: "550e8400-e29b-41d4-a716-446655440000"
+    DayIdAsIdPathParam:
+      name: id
+      in: path
+      required: true
+      description: Trip day unique identifier (UUID)
+      schema:
+        type: string
+        format: uuid
+        example: "880e8400-e29b-41d4-a716-446655440333"
+    DayIdPathParam:
+      name: dayId
+      in: path
+      required: true
+      description: Trip day unique identifier (UUID)
+      schema:
+        type: string
+        format: uuid
+        example: "880e8400-e29b-41d4-a716-446655440333"
+    ActivityIdPathParam:
+      name: activityId
+      in: path
+      required: true
+      description: Activity unique identifier (UUID)
+      schema:
+        type: string
+        format: uuid
+        example: "770e8400-e29b-41d4-a716-446655440222"
+    TripFilterQueryParam:
+      name: filter
+      in: query
+      required: false
+      description: |
+        Filter trips by status:
+        - `past`: Trips that have ended
+        - `current`: Trips currently happening
+        - `future`: Trips yet to start
+      schema:
+        type: string
+        enum: [past, current, future]
+        example: "future"
+
+  responses:
+    ValidationError:
+      description: Request validation error - Fields did not meet the specified requirements
+      content:
+        application/json:
+          schema:
+            $ref: "#/components/schemas/ValidationErrorBody"
+          examples:
+            example:
+              summary: Validation error example
+              value:
+                message:
+                  - code: "invalid_type"
+                    path: ["email"]
+                    message: "Expected string, received undefined"
+                  - code: "too_small"
+                    path: ["password"]
+                    message: "String must contain at least 8 character(s)"
+    UnauthorizedError:
+      description: Unauthorized request - Missing or invalid JWT token
+      content:
+        application/json:
+          schema:
+            $ref: "#/components/schemas/UnauthorizedErrorBody"
+          examples:
+            example:
+              summary: Unauthorized error example
+              value:
+                message: "Unauthorized access"
+    InternalServerError:
+      description: Unexpected server error - An unexpected error occurred on the server
+      content:
+        application/json:
+          schema:
+            $ref: "#/components/schemas/InternalServerErrorBody"
+          examples:
+            example:
+              summary: Internal server error example
+              value:
+                message: "Internal server error"
+                error: null
+
+  schemas:
+    RegisterRequest:
+      type: object
+      required: [name, email, password]
+      properties:
+        name:
+          type: string
+          minLength: 1
+          description: Full name of the user
+          example: "John Doe"
+        email:
+          type: string
+          format: email
+          description: Unique email address
+          example: "john@example.com"
+        password:
+          type: string
+          minLength: 8
+          description: Password must be at least 8 characters long
+          example: "SecurePassword123"
+
+    LoginRequest:
+      type: object
+      required: [email, password]
+      properties:
+        email:
+          type: string
+          format: email
+          description: User's email address
+          example: "john@example.com"
+        password:
+          type: string
+          minLength: 8
+          description: User's password
+          example: "SecurePassword123"
+
+    CreateTripRequest:
+      type: object
+      required: [title, description, startDate, endDate]
+      properties:
+        title:
+          type: string
+          minLength: 1
+          description: Trip name/title
+          example: "Summer Vacation 2026"
+        description:
+          type: string
+          maxLength: 250
+          description: Detailed description of the trip
+          example: "Our amazing trip to Europe"
+        startDate:
+          type: string
+          format: date-time
+          description: Trip start date in ISO 8601 format
+          example: "2026-06-01T09:00:00Z"
+        endDate:
+          type: string
+          format: date-time
+          description: Trip end date in ISO 8601 format (must be after startDate)
+          example: "2026-06-15T18:00:00Z"
+
+    UpdateTripRequest:
+      $ref: "#/components/schemas/CreateTripRequest"
+
+    CreateMemberRequest:
+      type: object
+      required: [email, tripId]
+      properties:
+        email:
+          type: string
+          format: email
+          description: Email of the user to invite
+          example: "friend@example.com"
+        tripId:
+          type: string
+          format: uuid
+          description: ID of the trip to invite the user to
+          example: "550e8400-e29b-41d4-a716-446655440000"
+
+    AcceptMemberRequest:
+      type: object
+      required: [memberId, status]
+      properties:
+        memberId:
+          type: string
+          format: uuid
+          description: Member invitation ID
+          example: "660e8400-e29b-41d4-a716-446655440111"
+        status:
+          type: string
+          enum: [ACCEPTED, REJECTED]
+          description: Response to the trip invitation
+          example: "ACCEPTED"
+
+    UpdateActivitiesRequest:
+      type: object
+      required: [activities]
+      properties:
+        activities:
+          type: array
+          items:
+            $ref: "#/components/schemas/ActivityUpsert"
+          description: Array of activities to create or update
+
+    ActivityUpsert:
+      type: object
+      required: [title, description, location, startTime, endTime]
+      properties:
+        activityId:
+          type: string
+          format: uuid
+          description: Existing activity id. If omitted, a new activity is created.
+          example: "770e8400-e29b-41d4-a716-446655440222"
+        title:
+          type: string
+          minLength: 1
+          description: Activity name
+          example: "Eiffel Tower Visit"
+        description:
+          type: string
+          description: Detailed description of the activity
+          example: "Visit the iconic Eiffel Tower with a guided tour"
+        location:
+          type: string
+          minLength: 1
+          description: Location of the activity
+          example: "Eiffel Tower, Paris"
+        startTime:
+          type: string
+          format: date-time
+          description: Activity start time in ISO 8601 format
+          example: "2026-06-01T18:00:00Z"
+        endTime:
+          type: string
+          format: date-time
+          description: Activity end time in ISO 8601 format
+          example: "2026-06-01T21:00:00Z"
+
+    Trip:
+      type: object
+      required: [id, title, startDate, endDate, createdAt, createdById]
+      properties:
+        id:
+          type: string
+          format: uuid
+          description: Unique trip identifier
+          example: "550e8400-e29b-41d4-a716-446655440000"
+        title:
+          type: string
+          description: Trip title
+          example: "Summer Vacation 2026"
+        description:
+          type: string
+          nullable: true
+          description: Trip description
+          example: "Our amazing trip to Europe"
+        startDate:
+          type: string
+          format: date-time
+          description: Trip start date
+          example: "2026-06-01T09:00:00Z"
+        endDate:
+          type: string
+          format: date-time
+          description: Trip end date
+          example: "2026-06-15T18:00:00Z"
+        createdAt:
+          type: string
+          format: date-time
+          description: Trip creation timestamp
+          example: "2026-04-05T10:30:00Z"
+        createdById:
+          type: string
+          format: uuid
+          description: ID of the user who created the trip
+          example: "123e4567-e89b-12d3-a456-426614174000"
+
+    TripMember:
+      type: object
+      required: [id, role, status, invitedAt, tripId, userId]
+      properties:
+        id:
+          type: string
+          format: uuid
+          description: Unique member record identifier
+          example: "660e8400-e29b-41d4-a716-446655440111"
+        role:
+          type: string
+          enum: [OWNER, MEMBER]
+          description: Member's role in the trip
+          example: "OWNER"
+        status:
+          type: string
+          enum: [PENDING, ACCEPTED, REJECTED]
+          description: Invitation status
+          example: "ACCEPTED"
+        invitedAt:
+          type: string
+          format: date-time
+          description: When the user was invited
+          example: "2026-04-05T10:30:00Z"
+        joinedAt:
+          type: string
+          format: date-time
+          nullable: true
+          description: When the user accepted the invitation
+          example: "2026-04-05T11:00:00Z"
+        tripId:
+          type: string
+          format: uuid
+          description: Associated trip ID
+          example: "550e8400-e29b-41d4-a716-446655440000"
+        userId:
+          type: string
+          format: uuid
+          description: Associated user ID
+          example: "123e4567-e89b-12d3-a456-426614174000"
+
+    TripWithMembers:
+      allOf:
+        - $ref: "#/components/schemas/Trip"
+        - type: object
+          required: [members]
+          properties:
+            members:
+              type: array
+              items:
+                $ref: "#/components/schemas/TripMember"
+              description: All members of the trip
+
+    Activity:
+      type: object
+      required:
+        [
+          id,
+          title,
+          startTime,
+          endTime,
+          createdAt,
+          tripId,
+          tripDayId,
+          createdById,
+        ]
+      properties:
+        id:
+          type: string
+          format: uuid
+          description: Unique activity identifier
+          example: "770e8400-e29b-41d4-a716-446655440222"
+        title:
+          type: string
+          description: Activity name
+          example: "Eiffel Tower Visit"
+        description:
+          type: string
+          nullable: true
+          description: Detailed description
+          example: "Visit the iconic Eiffel Tower with a guided tour"
+        location:
+          type: string
+          nullable: true
+          description: Activity location
+          example: "Eiffel Tower, Paris"
+        startTime:
+          type: string
+          format: date-time
+          description: Activity start time
+          example: "2026-06-01T18:00:00Z"
+        endTime:
+          type: string
+          format: date-time
+          description: Activity end time
+          example: "2026-06-01T21:00:00Z"
+        createdAt:
+          type: string
+          format: date-time
+          description: Activity creation timestamp
+          example: "2026-06-01T10:00:00Z"
+        tripId:
+          type: string
+          format: uuid
+          description: Associated trip ID
+          example: "550e8400-e29b-41d4-a716-446655440000"
+        tripDayId:
+          type: string
+          format: uuid
+          description: Associated trip day ID
+          example: "880e8400-e29b-41d4-a716-446655440333"
+        createdById:
+          type: string
+          format: uuid
+          description: ID of the user who created the activity
+          example: "123e4567-e89b-12d3-a456-426614174000"
+
+    TripDay:
+      type: object
+      required: [id, date, tripId]
+      properties:
+        id:
+          type: string
+          format: uuid
+          description: Unique trip day identifier
+          example: "880e8400-e29b-41d4-a716-446655440333"
+        date:
+          type: string
+          format: date-time
+          description: Date of the trip day
+          example: "2026-06-01T00:00:00Z"
+        tripId:
+          type: string
+          format: uuid
+          description: Associated trip ID
+          example: "550e8400-e29b-41d4-a716-446655440000"
+
+    TripDayWithActivities:
+      allOf:
+        - $ref: "#/components/schemas/TripDay"
+        - type: object
+          required: [activities]
+          properties:
+            activities:
+              type: array
+              items:
+                $ref: "#/components/schemas/Activity"
+              description: All activities scheduled for this day
+
+    PendingInvitation:
+      type: object
+      required: [id, role, invitedAt, tripId, trip]
+      properties:
+        id:
+          type: string
+          format: uuid
+          description: Pending invitation record ID
+          example: "660e8400-e29b-41d4-a716-446655440111"
+        role:
+          type: string
+          enum: [OWNER, MEMBER]
+          description: Role that would be assigned
+          example: "MEMBER"
+        invitedAt:
+          type: string
+          format: date-time
+          description: When the invitation was sent
+          example: "2026-04-05T10:30:00Z"
+        tripId:
+          type: string
+          format: uuid
+          description: Associated trip ID
+          example: "550e8400-e29b-41d4-a716-446655440000"
+        trip:
+          $ref: "#/components/schemas/Trip"
+
+    MessageOnlyResponse:
+      type: object
+      required: [message]
+      properties:
+        message:
+          type: string
+          description: Response message
+          example: "Operation completed successfully"
+
+    AuthSuccessResponse:
+      type: object
+      required: [message, data]
+      properties:
+        message:
+          type: string
+          description: Authentication response message
+          example: "Login successful"
+        data:
+          type: string
+          description: Signed JWT token (valid for 7 days)
+          example: "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJ1c2VybmFtZSI6IkpvaG4gRG9lIiwidXNlcklkIjoiMTIzZTQ1NjctZTg5Yi0xMmQzLWE0NTYtNDI2NjE0MTc0MDAwIiwiaWF0IjoxNjQ0MzI0ODAwfQ.signature"
+
+    TripResponse:
+      type: object
+      required: [message, data]
+      properties:
+        message:
+          type: string
+          description: Response message
+          example: "Trip successfully created"
+        data:
+          $ref: "#/components/schemas/Trip"
+
+    TripsListResponse:
+      type: object
+      required: [message, data]
+      properties:
+        message:
+          type: string
+          description: Response message
+          example: "Ok"
+        data:
+          type: array
+          items:
+            $ref: "#/components/schemas/Trip"
+          description: List of trips
+
+    TripWithMembersResponse:
+      type: object
+      required: [message, data]
+      properties:
+        message:
+          type: string
+          description: Response message
+          example: "Ok"
+        data:
+          $ref: "#/components/schemas/TripWithMembers"
+
+    TripMemberResponse:
+      type: object
+      required: [message, data]
+      properties:
+        message:
+          type: string
+          description: Response message
+          example: "Successfully accepted membership"
+        data:
+          $ref: "#/components/schemas/TripMember"
+
+    PendingInvitationsResponse:
+      type: object
+      required: [message, data]
+      properties:
+        message:
+          type: string
+          description: Response message
+          example: "Ok"
+        data:
+          type: array
+          items:
+            $ref: "#/components/schemas/PendingInvitation"
+
+    TripDaysListResponse:
+      type: object
+      required: [message, data]
+      properties:
+        message:
+          type: string
+          description: Response message
+          example: "Ok"
+        data:
+          type: array
+          items:
+            $ref: "#/components/schemas/TripDayWithActivities"
+
+    TripDayResponse:
+      type: object
+      required: [message, data]
+      properties:
+        message:
+          type: string
+          description: Response message
+          example: "Ok"
+        data:
+          $ref: "#/components/schemas/TripDayWithActivities"
+
+    UpdateActivitiesResult:
+      type: object
+      required: [created, updated]
+      properties:
+        created:
+          type: integer
+          minimum: 0
+          description: Number of activities created
+          example: 2
+        updated:
+          type: integer
+          minimum: 0
+          description: Number of activities updated
+          example: 1
+
+    UpdateActivitiesResponse:
+      type: object
+      required: [message, data]
+      properties:
+        message:
+          type: string
+          description: Response message
+          example: "Successfully updated activities"
+        data:
+          $ref: "#/components/schemas/UpdateActivitiesResult"
+
+    ActivityResponse:
+      type: object
+      required: [message, data]
+      properties:
+        message:
+          type: string
+          description: Response message
+          example: "Activity successfully deleted"
+        data:
+          $ref: "#/components/schemas/Activity"
+
+    ZodIssue:
+      type: object
+      description: Zod validation issue
+      properties:
+        code:
+          type: string
+          description: Error code
+          example: "invalid_type"
+        path:
+          type: array
+          items:
+            oneOf:
+              - type: string
+              - type: integer
+          description: Path to the invalid field
+          example: ["email"]
+        message:
+          type: string
+          description: Error message
+          example: "Invalid email"
+
+    ValidationErrorBody:
+      type: object
+      required: [message]
+      properties:
+        message:
+          type: array
+          items:
+            $ref: "#/components/schemas/ZodIssue"
+          description: Array of validation errors
+
+    UnauthorizedErrorBody:
+      type: object
+      required: [message]
+      properties:
+        message:
+          type: string
+          description: Error message
+          example: "Unauthorized access"
+
+    CustomErrorPayload:
+      type: object
+      required: [name, statusCode]
+      properties:
+        name:
+          type: string
+          description: Error type
+          example: "Error"
+        statusCode:
+          type: integer
+          description: HTTP status code
+          example: 404
+        message:
+          type: string
+          description: Detailed error message
+          example: "Trip not found"
+
+    CustomErrorBody:
+      type: object
+      required: [message, error]
+      properties:
+        message:
+          type: string
+          description: Error summary
+          example: "An error occurred"
+        error:
+          $ref: "#/components/schemas/CustomErrorPayload"
+
+    InternalServerErrorBody:
+      type: object
+      required: [message, error]
+      properties:
+        message:
+          type: string
+          description: Error message
+          example: "Internal server error"
+        error:
+          type: object
+          nullable: true
+          description: Error details (null in production)

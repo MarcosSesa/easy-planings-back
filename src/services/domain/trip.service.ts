@@ -8,6 +8,22 @@ type TripData = {
     endDate: Date;
 }
 
+const buildTripDaysRange = (startDate: Date, endDate: Date, tripId: string) => {
+    const days: { date: Date; tripId: string }[] = [];
+    const currentDate = new Date(startDate);
+
+    while (currentDate <= endDate) {
+        days.push({
+            date: new Date(currentDate),
+            tripId,
+        });
+
+        currentDate.setDate(currentDate.getDate() + 1);
+    }
+
+    return days;
+};
+
 export const createTrip = async (tripData: TripData, userId: string) => {
     return prismaService.$transaction(async (tx) => {
         const trip = await tx.trip.create({
@@ -30,19 +46,7 @@ export const createTrip = async (tripData: TripData, userId: string) => {
             },
         });
 
-        const days: { date: Date; tripId: string }[] = [];
-
-        const currentDate = tripData.startDate;
-        const endDate = tripData.endDate;
-
-        while (currentDate <= endDate) {
-            days.push({
-                date: new Date(currentDate),
-                tripId: trip.id,
-            });
-            currentDate.setDate(currentDate.getDate() + 1);
-        }
-        console.log(days)
+        const days = buildTripDaysRange(tripData.startDate, tripData.endDate, trip.id);
 
         await tx.tripDay.createMany({
             data: days,
@@ -74,16 +78,49 @@ export const updateTrip = async (tripData: TripData, tripId: string, userId: str
     });
 
     if (!membership || membership.status !== "ACCEPTED") throw new CustomError("You are not a member of this trip", 401);
+    if (tripData.endDate < tripData.startDate) throw new CustomError("Invalid date format, startDate cannot be lower than endDate", 400);
 
+    return prismaService.$transaction(async (tx) => {
+        const updatedTrip = await tx.trip.update({
+            where: {id: tripId},
+            data: {
+                title: tripData.title,
+                description: tripData.description,
+                startDate: tripData.startDate,
+                endDate: tripData.endDate,
+            },
+        });
 
-    return  prismaService.trip.update({
-        where: {id: tripId},
-        data: {
-            title: tripData.title,
-            description: tripData.description,
-            startDate: tripData.startDate,
-            endDate: tripData.endDate,
-        },
+        const expectedDays = buildTripDaysRange(tripData.startDate, tripData.endDate, tripId);
+        const expectedDayTimestamps = new Set(expectedDays.map((day) => day.date.getTime()));
+
+        const existingDays = await tx.tripDay.findMany({
+            where: {tripId},
+            select: {id: true, date: true},
+        });
+
+        const existingDayTimestamps = new Set(existingDays.map((day) => day.date.getTime()));
+
+        const dayIdsToDelete = existingDays
+            .filter((day) => !expectedDayTimestamps.has(day.date.getTime()))
+            .map((day) => day.id);
+
+        const daysToCreate = expectedDays
+            .filter((day) => !existingDayTimestamps.has(day.date.getTime()));
+
+        if (dayIdsToDelete.length > 0) {
+            await tx.tripDay.deleteMany({
+                where: {id: {in: dayIdsToDelete}},
+            });
+        }
+
+        if (daysToCreate.length > 0) {
+            await tx.tripDay.createMany({
+                data: daysToCreate,
+            });
+        }
+
+        return updatedTrip;
     });
 };
 

@@ -14,7 +14,6 @@ export const getTripDaysByTripId = async (userId: string, tripId: string) => {
     return prismaService.tripDay.findMany({
         where: {tripId: tripId},
         orderBy: {date: 'asc'},
-        include: {activities: true}
     })
 }
 
