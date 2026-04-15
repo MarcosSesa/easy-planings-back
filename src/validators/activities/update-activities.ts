@@ -1,4 +1,4 @@
-import {array, coerce, object, optional, string, uuid, z} from "zod";
+import {array, coerce, object, optional, string, uuid} from "zod";
 
 export const updateActivitiesParamsValidator = object({
     tripId: uuid().nonempty('Parameter tripId cannot be empty'),
@@ -20,6 +20,11 @@ export const updateActivitiesBodyValidator = object(
     },
     {error: "Request body is required"});
 
-export type ActivityInterface = z.infer<typeof activitySchema>;
-
-
+export type ActivityInterface = {
+    activityId?: string;
+    title: string;
+    description: string;
+    location: string | null;
+    startTime: Date;
+    endTime: Date;
+};

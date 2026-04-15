@@ -8,7 +8,7 @@ import {
 
 const router = Router();
 
-router.post("/create",JwtAuthMiddleware, createMemberController);
+router.post("/invite",JwtAuthMiddleware, createMemberController);
 router.put("/resolve-membership",JwtAuthMiddleware, acceptMembershipController);
 router.get("/invitations",JwtAuthMiddleware, listPendingMembershipController );
 

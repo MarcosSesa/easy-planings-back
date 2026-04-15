@@ -9,7 +9,7 @@ export const upsertActivityBodyValidator = object({
     activityId: optional(uuid()),
     title: string().nonempty('Parameter title cannot be empty'),
     description: string(),
-    location: string().nonempty('Parameter location cannot be empty'),
+    location: string().nullable(),
     startTime: coerce.date(),
     endTime: coerce.date(),
 });

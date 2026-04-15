@@ -15,14 +15,15 @@ configDotenv();
 const app = express();
 
 app.use(express.json());
-app.use(cors());
+app.use(cors({
+    allowedHeaders: ['Authorization', 'Content-Type']
+}));
 
 app.use("/auth", authRouter);
 app.use("/trip", tripRouter);
 app.use("/members", memberRouter);
 app.use("/:tripId/days", tripDayRouter)
 app.use("/:tripId/days/:dayId/activities", activitiesRouter)
-
 
 
 app.use(zodErrorHandler);

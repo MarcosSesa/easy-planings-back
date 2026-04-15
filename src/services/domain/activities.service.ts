@@ -1,6 +1,7 @@
 import {ActivityInterface} from "src/validators/activities/update-activities";
 import {prismaService} from "src/services/prisma.service";
 import {CustomError} from "src/util/custom-error.util";
+import {notifyActivityUpdated} from "src/services/domain/activity-sse.service";
 
 export const updateActivities = async (userId: string, tripId: string, dayId: string, activities: ActivityInterface[]) => {
     const trip = await prismaService.trip.findUnique({where: {id: tripId}, include: {members: true}});
@@ -21,7 +22,7 @@ export const updateActivities = async (userId: string, tripId: string, dayId: st
     }
 
     if (updatedActivities.length > 0) {
-        await prismaService.$transaction(
+        const updatedResults = await prismaService.$transaction(
             updatedActivities.map((activity) =>
                 prismaService.activity.update({
                     where: { id: activity.activityId },
@@ -35,6 +36,7 @@ export const updateActivities = async (userId: string, tripId: string, dayId: st
                 })
             )
         );
+        updatedResults.forEach(result => notifyActivityUpdated(result.id, result, userId));
     }
 
     return { created: newActivities.length, updated: updatedActivities.length };
@@ -52,7 +54,7 @@ export const upsertActivity = async (userId: string, tripId: string, dayId: stri
 
     if (!activity.activityId) {
         // Create new activity
-        return await prismaService.activity.create({
+        const result = await prismaService.activity.create({
             data: {
                 title: activity.title,
                 description: activity.description,
@@ -64,9 +66,11 @@ export const upsertActivity = async (userId: string, tripId: string, dayId: stri
                 tripDayId: dayId
             }
         });
+        notifyActivityUpdated(result.id, result, userId);
+        return result;
     } else {
         // Update existing activity
-        return await prismaService.activity.update({
+        const result = await prismaService.activity.update({
             where: { id: activity.activityId },
             data: {
                 title: activity.title,
@@ -76,6 +80,8 @@ export const upsertActivity = async (userId: string, tripId: string, dayId: stri
                 endTime: activity.endTime,
             }
         });
+        notifyActivityUpdated(result.id, result, userId);
+        return result;
     }
 }
 

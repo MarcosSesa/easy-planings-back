@@ -154,7 +154,7 @@ export const getTripsList = async (userId: string, filter?: "past" | "current" |
 export const getTripById = async (tripId: string, userId: string) => {
     const trip = await prismaService.trip.findUnique({
         where: {id: tripId},
-        include: {members: true}
+        include: {members: {where: {status: 'ACCEPTED'},include: {user: {select: {id: true, email: true, name: true}}}}}
     });
     if (!trip) throw new CustomError("There is no trip with the provided id", 400);
 

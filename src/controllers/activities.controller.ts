@@ -5,7 +5,9 @@ import {
 } from "src/validators/activities/update-activities";
 import {deleteActivity, updateActivities, upsertActivity} from "src/services/domain/activities.service";
 import {deleteActivityParamsValidator} from "src/validators/activities/delete-activity";
-import {upsertActivityParamsValidator, upsertActivityBodyValidator} from "src/validators/activities/upsert-activity";
+import {upsertActivityBodyValidator, upsertActivityParamsValidator} from "src/validators/activities/upsert-activity";
+import {addClient, removeClient} from "src/services/domain/activity-sse.service";
+import {streamActivitiesParamsValidator} from "src/validators/activities/stream-activity";
 
 export const updateActivitiesController: RequestHandler = async (req, res) => {
     const userId = req.user!.id;
@@ -28,4 +30,24 @@ export const deleteActivityController: RequestHandler = async (req, res) => {
     const params = deleteActivityParamsValidator.parse(req.params);
     const result = await deleteActivity(userId, params.tripId, params.dayId, params.activityId)
     return res.status(200).json({message: 'Activity successfully deleted', data:  result});
+}
+
+export const streamActivityController: RequestHandler = (req, res) => {
+    const params = streamActivitiesParamsValidator.parse(req.params);
+    const activityId = params.activityId;
+    const userId = req.user!.id;
+
+    res.setHeader('Content-Type', 'text/event-stream');
+    res.setHeader('Cache-Control', 'no-cache');
+    res.setHeader('Connection', 'keep-alive');
+
+    res.flushHeaders();
+
+    addClient(activityId, userId, res);
+
+    res.write('data: connected\n\n');
+
+    req.on('close', () => {
+        removeClient(activityId, res);
+    });
 }

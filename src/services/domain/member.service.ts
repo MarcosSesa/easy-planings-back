@@ -17,7 +17,9 @@ export const createMember = async (userId: string, invitedUserEmail: string, tri
         where: {tripId_userId: {tripId, userId: invitedUser.id}},
     });
 
-    if (existingMember) throw new CustomError("User is already a member of this trip", 409);
+    if (existingMember) {
+        return prismaService.tripMember.update({where: {id: existingMember.id}, data: {status: 'PENDING', invitedAt: new Date()}})
+    }
 
     return prismaService.tripMember.create({
         data: {
