@@ -1,12 +1,7 @@
 import {prismaService} from "src/services/prisma.service";
 import {CustomError} from "src/util/custom-error.util";
+import {CreateTripData} from "src/types/trip.types";
 
-type TripData = {
-    title: string;
-    description?: string;
-    startDate: Date;
-    endDate: Date;
-}
 
 const buildTripDaysRange = (startDate: Date, endDate: Date, tripId: string) => {
     const days: { date: Date; tripId: string }[] = [];
@@ -24,7 +19,7 @@ const buildTripDaysRange = (startDate: Date, endDate: Date, tripId: string) => {
     return days;
 };
 
-export const createTrip = async (tripData: TripData, userId: string) => {
+export const createTrip = async (tripData: CreateTripData, userId: string) => {
     return prismaService.$transaction(async (tx) => {
         const trip = await tx.trip.create({
             data: {
@@ -67,10 +62,11 @@ export const deleteTrip = async (tripId: string, userId: string) => {
     return prismaService.trip.delete({where: {id: tripId}});
 }
 
-export const updateTrip = async (tripData: TripData, tripId: string, userId: string) => {
+export const updateTrip = async (tripData: CreateTripData, tripId: string, userId: string) => {
     const trip = await prismaService.trip.findUnique({where: { id: tripId },});
 
     if (!trip) throw new CustomError("Trip not found", 404);
+    if (trip.createdById !== userId) throw new CustomError("Only the creator of the trip can update it", 401);
 
     const membership = await prismaService.tripMember.findUnique({
         where: {tripId_userId: { tripId, userId },},

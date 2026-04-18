@@ -32,7 +32,7 @@
     "typescript": "^5.9.3"
   },
   "dependencies": {
-    "@google/genai": "^1.43.0",
+    "@google/genai": "^1.50.1",
     "@prisma/adapter-pg": "^7.4.1",
     "@prisma/client": "^7.4.1",
     "bcrypt": "^6.0.0",

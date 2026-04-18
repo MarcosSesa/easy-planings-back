@@ -2,6 +2,7 @@ import {Router} from "express";
 import {
     createTripController,
     deleteTripController,
+    generateTripController,
     getTripByIdController,
     getTripsController,
     updateTripController
@@ -11,6 +12,7 @@ import {JwtAuthMiddleware} from "src/midelwares/jwt-auth.middleware";
 const router = Router();
 
 router.post("/create",JwtAuthMiddleware, createTripController);
+router.post("/generate",JwtAuthMiddleware, generateTripController);
 router.delete("/delete/:id",JwtAuthMiddleware, deleteTripController);
 router.put("/update/:id",JwtAuthMiddleware, updateTripController);
 router.get("/trips",JwtAuthMiddleware, getTripsController);

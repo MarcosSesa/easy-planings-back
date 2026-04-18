@@ -2,6 +2,7 @@ import {ActivityInterface} from "src/validators/activities/update-activities";
 import {prismaService} from "src/services/prisma.service";
 import {CustomError} from "src/util/custom-error.util";
 import {notifyActivityUpdated} from "src/services/domain/activity-sse.service";
+import {notifyTripDayUpdated} from "src/services/domain/trip-day-sse.service";
 
 export const updateActivities = async (userId: string, tripId: string, dayId: string, activities: ActivityInterface[]) => {
     const trip = await prismaService.trip.findUnique({where: {id: tripId}, include: {members: true}});
@@ -39,6 +40,12 @@ export const updateActivities = async (userId: string, tripId: string, dayId: st
         updatedResults.forEach(result => notifyActivityUpdated(result.id, result, userId));
     }
 
+    const updatedTripDay = await prismaService.tripDay.findUnique({
+        where: { id: dayId },
+        include: { activities: true }
+    });
+    notifyTripDayUpdated(dayId, updatedTripDay!, userId);
+
     return { created: newActivities.length, updated: updatedActivities.length };
 }
 
@@ -52,8 +59,13 @@ export const upsertActivity = async (userId: string, tripId: string, dayId: stri
     const day = await prismaService.tripDay.findUnique({where: {id: dayId}});
     if (!day) throw new CustomError("You are trying to edit a day that not exist", 404);
 
+    const updatedTripDay = await prismaService.tripDay.findUnique({
+        where: { id: dayId },
+        include: { activities: true }
+    });
+
+    // IF no activityId provided CREATE ELSE UPDATE
     if (!activity.activityId) {
-        // Create new activity
         const result = await prismaService.activity.create({
             data: {
                 title: activity.title,
@@ -67,9 +79,9 @@ export const upsertActivity = async (userId: string, tripId: string, dayId: stri
             }
         });
         notifyActivityUpdated(result.id, result, userId);
+        notifyTripDayUpdated(dayId, updatedTripDay!, userId);
         return result;
     } else {
-        // Update existing activity
         const result = await prismaService.activity.update({
             where: { id: activity.activityId },
             data: {
@@ -81,8 +93,11 @@ export const upsertActivity = async (userId: string, tripId: string, dayId: stri
             }
         });
         notifyActivityUpdated(result.id, result, userId);
+        notifyTripDayUpdated(dayId, updatedTripDay!, userId);
         return result;
     }
+
+
 }
 
 export const deleteActivity = async (userId: string, tripId: string, dayId: string, activityId: string) => {
@@ -95,6 +110,14 @@ export const deleteActivity = async (userId: string, tripId: string, dayId: stri
     const day = await prismaService.tripDay.findUnique({where: {id: dayId}});
     if (!day) throw new CustomError("You are trying to edit a day that not exist", 404);
 
+    const result = await prismaService.activity.delete({where: {id: activityId}});
 
-    return prismaService.activity.delete({where: {id: activityId}});
+
+    const updatedTripDay = await prismaService.tripDay.findUnique({
+        where: { id: dayId },
+        include: { activities: true }
+    });
+    notifyTripDayUpdated(dayId, updatedTripDay!, userId);
+
+    return result;
 }

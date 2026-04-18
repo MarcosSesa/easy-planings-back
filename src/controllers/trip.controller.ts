@@ -4,6 +4,7 @@ import {createTrip, deleteTrip, getTripById, getTripsList, updateTrip} from "src
 import {deleteTripValidator} from "src/validators/trip/delete-trip";
 import {updateTripBodyValidator, updateTripParamValidator} from "src/validators/trip/update-trip";
 import {getTripsQueryValidator} from "src/validators/trip/get-trips";
+import {generateTrip} from "src/services/gemini.service";
 
 export const createTripController: RequestHandler = async (req, res) => {
     const userId = req.user!.id;
@@ -49,4 +50,14 @@ export const getTripByIdController: RequestHandler = async (req, res) => {
 
     return res.status(200).json({message: 'Ok',data:  trip});
 
+}
+
+export const generateTripController: RequestHandler = async (req, res) => {
+    const userId = req.user!.id;
+
+    const tripData = crateTripValidator.parse(req.body);
+    if(tripData.endDate < tripData.startDate)return res.status(400).send({error: "Invalid date format, startDate cannot be lower than endDate"});
+    const tripCreated = await generateTrip(tripData, userId);
+
+    return res.status(201).json({message: "Trip successfully created with AI-generated activities", data: tripCreated});
 }
