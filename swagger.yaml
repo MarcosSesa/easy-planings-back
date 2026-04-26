@@ -3,12 +3,14 @@ info:
   title: Easy Planings Back API
   version: 1.0.0
   description: |
-    A comprehensive API for managing group travel plans with real-time collaboration.
+    A comprehensive API for managing group travel plans with real-time collaboration features.
 
     ## Features
     - User authentication with JWT tokens
     - Create and manage trips with multiple members
     - Organize trips by days and activities
+    - AI-powered trip generation with Gemini
+    - Real-time updates via Server-Sent Events (SSE)
     - Invite other users to join your trips
     - Role-based access control (Owner/Member)
 
@@ -16,6 +18,10 @@ info:
     1. Register a new account using `/auth/register`
     2. Login to receive a JWT token using `/auth/login`
     3. Include the token in the `Authorization: Bearer <token>` header for protected endpoints
+
+    ## Real-Time Features
+    - Stream activity updates: `GET /{tripId}/days/{dayId}/activities/{activityId}/stream`
+    - Stream trip day updates: `GET /{tripId}/days/{id}/stream`
 
     ## Error Handling
     All error responses follow a consistent format with descriptive messages and error codes.
@@ -33,13 +39,13 @@ tags:
   - name: Auth
     description: Authentication endpoints for user registration and login
   - name: Trips
-    description: Endpoints for managing trips
+    description: Endpoints for managing trips, including AI-powered generation
   - name: Members
     description: Endpoints for managing trip memberships and invitations
   - name: Trip Days
-    description: Endpoints for retrieving trip days and their activities
+    description: Endpoints for retrieving trip days with real-time streaming
   - name: Activities
-    description: Endpoints for managing activities within trip days
+    description: Endpoints for managing activities with real-time updates
 security:
   - bearerAuth: []
 paths:
@@ -124,44 +130,86 @@ paths:
         "500":
           $ref: "#/components/responses/InternalServerError"
 
-  /trip/create:
-    post:
-      tags: [Trips]
-      summary: Create a new trip
-      operationId: createTrip
-      description: Creates a new trip. The authenticated user becomes the trip owner. Start date must be before end date.
-      requestBody:
-        required: true
-        content:
-          application/json:
-            schema:
-              $ref: "#/components/schemas/CreateTripRequest"
-      responses:
-        "201":
-          description: Trip successfully created
-          content:
-            application/json:
-              schema:
-                $ref: "#/components/schemas/TripResponse"
-        "400":
-          description: Invalid input or date range
-          content:
-            application/json:
-              schema:
-                oneOf:
-                  - $ref: "#/components/schemas/ValidationErrorBody"
-                  - $ref: "#/components/schemas/MessageOnlyResponse"
-        "401":
-          $ref: "#/components/responses/UnauthorizedError"
-        "500":
-          $ref: "#/components/responses/InternalServerError"
+   /trip/create:
+     post:
+       tags: [Trips]
+       summary: Create a new trip
+       operationId: createTrip
+       description: Creates a new trip. The authenticated user becomes the trip owner. Start date must be before end date. Trip days will be automatically generated for each day between start and end dates.
+       requestBody:
+         required: true
+         content:
+           application/json:
+             schema:
+               $ref: "#/components/schemas/CreateTripRequest"
+       responses:
+         "201":
+           description: Trip successfully created with auto-generated trip days
+           content:
+             application/json:
+               schema:
+                 $ref: "#/components/schemas/TripResponse"
+         "400":
+           description: Invalid input or date range
+           content:
+             application/json:
+               schema:
+                 oneOf:
+                   - $ref: "#/components/schemas/ValidationErrorBody"
+                   - $ref: "#/components/schemas/MessageOnlyResponse"
+         "401":
+           $ref: "#/components/responses/UnauthorizedError"
+         "500":
+           $ref: "#/components/responses/InternalServerError"
 
-  /trip/delete/{id}:
-    delete:
-      tags: [Trips]
-      summary: Delete a trip by ID
-      operationId: deleteTrip
-      description: Deletes a trip permanently. Only the trip owner can delete a trip. All associated data (members, days, activities) will be deleted.
+   /trip/generate:
+     post:
+       tags: [Trips]
+       summary: Create a new trip with AI-generated activities
+       operationId: generateTrip
+       description: |
+         Creates a new trip and automatically generates activities using Google Gemini AI.
+         The authenticated user becomes the trip owner. Trip days will be auto-generated,
+         and activities will be created for each day based on the trip destination.
+       requestBody:
+         required: true
+         content:
+           application/json:
+             schema:
+               $ref: "#/components/schemas/CreateTripRequest"
+       responses:
+         "201":
+           description: Trip successfully created with AI-generated activities
+           content:
+             application/json:
+               schema:
+                 $ref: "#/components/schemas/TripResponse"
+         "400":
+           description: Invalid input or date range
+           content:
+             application/json:
+               schema:
+                 oneOf:
+                   - $ref: "#/components/schemas/ValidationErrorBody"
+                   - $ref: "#/components/schemas/MessageOnlyResponse"
+         "401":
+           $ref: "#/components/responses/UnauthorizedError"
+         "500":
+           description: Internal server error or AI generation failure
+           content:
+             application/json:
+               schema:
+                 $ref: "#/components/schemas/InternalServerErrorBody"
+
+   /trip/delete/{id}:
+     delete:
+       tags: [Trips]
+       summary: Delete a trip by ID
+       operationId: deleteTrip
+       description: |
+         Deletes a trip permanently.
+         ⚠️ **IMPORTANT**: Only the trip owner (user who created the trip) can delete it.
+         All associated data (members, days, activities) will be deleted.
       parameters:
         - $ref: "#/components/parameters/TripIdAsIdPathParam"
       responses:
@@ -190,12 +238,15 @@ paths:
         "500":
           $ref: "#/components/responses/InternalServerError"
 
-  /trip/update/{id}:
-    put:
-      tags: [Trips]
-      summary: Update trip details by ID
-      operationId: updateTrip
-      description: Updates trip information. Only trip members can update trip details.
+   /trip/update/{id}:
+     put:
+       tags: [Trips]
+       summary: Update trip details by ID
+       operationId: updateTrip
+       description: |
+         Updates trip information. Only trip members can update trip details.
+         
+         **Note**: Only the trip owner can edit or delete the trip. Members can only view and manage activities.
       parameters:
         - $ref: "#/components/parameters/TripIdAsIdPathParam"
       requestBody:
@@ -292,12 +343,12 @@ paths:
         "500":
           $ref: "#/components/responses/InternalServerError"
 
-  /members/create:
-    post:
-      tags: [Members]
-      summary: Invite a member to a trip
-      operationId: inviteMember
-      description: Sends an invitation to a user to join a trip. Only the trip owner can invite members.
+   /members/invite:
+     post:
+       tags: [Members]
+       summary: Invite a member to a trip
+       operationId: inviteMember
+       description: Sends an invitation to a user to join a trip. Only the trip owner can invite members.
       requestBody:
         required: true
         content:
@@ -432,116 +483,275 @@ paths:
         "500":
           $ref: "#/components/responses/InternalServerError"
 
-  /{tripId}/days/{id}:
-    get:
-      tags: [Trip Days]
-      summary: Get a trip day by ID
-      operationId: getTripDayById
-      description: Retrieves details of a specific trip day including all its activities.
-      parameters:
-        - $ref: "#/components/parameters/TripIdPathParam"
-        - $ref: "#/components/parameters/DayIdAsIdPathParam"
-      responses:
-        "200":
-          description: Trip day details
-          content:
-            application/json:
-              schema:
-                $ref: "#/components/schemas/TripDayResponse"
-        "400":
-          $ref: "#/components/responses/ValidationError"
-        "401":
-          description: Unauthorized or not a trip member
-          content:
-            application/json:
-              schema:
-                oneOf:
-                  - $ref: "#/components/schemas/UnauthorizedErrorBody"
-                  - $ref: "#/components/schemas/CustomErrorBody"
-        "500":
-          $ref: "#/components/responses/InternalServerError"
+   /{tripId}/days/{id}:
+     get:
+       tags: [Trip Days]
+       summary: Get a trip day by ID
+       operationId: getTripDayById
+       description: Retrieves details of a specific trip day including all its activities.
+       parameters:
+         - $ref: "#/components/parameters/TripIdPathParam"
+         - $ref: "#/components/parameters/DayIdAsIdPathParam"
+       responses:
+         "200":
+           description: Trip day details
+           content:
+             application/json:
+               schema:
+                 $ref: "#/components/schemas/TripDayResponse"
+         "400":
+           $ref: "#/components/responses/ValidationError"
+         "401":
+           description: Unauthorized or not a trip member
+           content:
+             application/json:
+               schema:
+                 oneOf:
+                   - $ref: "#/components/schemas/UnauthorizedErrorBody"
+                   - $ref: "#/components/schemas/CustomErrorBody"
+         "500":
+           $ref: "#/components/responses/InternalServerError"
 
-  /{tripId}/days/{dayId}/activities/update-activities:
-    post:
-      tags: [Activities]
-      summary: Create and/or update activities for a trip day
-      operationId: updateActivities
-      description: |
-        Create new activities or update existing ones for a specific trip day.
+   /{tripId}/days/{id}/stream:
+     get:
+       tags: [Trip Days]
+       summary: Stream real-time updates for a trip day
+       operationId: streamTripDay
+       description: |
+         Establishes a Server-Sent Events (SSE) connection to receive real-time updates
+         when the trip day or its activities change. The connection will send JSON events
+         whenever any property of the day or its activities is modified.
 
-        - To create a new activity, omit the `activityId` field
-        - To update an existing activity, include its `activityId`
-        - Both creation and update can be mixed in a single request
-      parameters:
-        - $ref: "#/components/parameters/TripIdPathParam"
-        - $ref: "#/components/parameters/DayIdPathParam"
-      requestBody:
-        required: true
-        content:
-          application/json:
-            schema:
-              $ref: "#/components/schemas/UpdateActivitiesRequest"
-      responses:
-        "200":
-          description: Activities update summary
-          content:
-            application/json:
-              schema:
-                $ref: "#/components/schemas/UpdateActivitiesResponse"
-        "400":
-          $ref: "#/components/responses/ValidationError"
-        "401":
-          description: Unauthorized or not a trip member
-          content:
-            application/json:
-              schema:
-                oneOf:
-                  - $ref: "#/components/schemas/UnauthorizedErrorBody"
-                  - $ref: "#/components/schemas/CustomErrorBody"
-        "404":
-          description: Trip or day not found
-          content:
-            application/json:
-              schema:
-                $ref: "#/components/schemas/CustomErrorBody"
-        "500":
-          $ref: "#/components/responses/InternalServerError"
+         **Note**: The user who makes the changes will NOT receive the update notification.
 
-  /{tripId}/days/{dayId}/activities/{activityId}/delete-activity:
-    delete:
-      tags: [Activities]
-      summary: Delete an activity from a trip day
-      operationId: deleteActivity
-      description: Deletes a specific activity from a trip day. Only trip members can delete activities.
-      parameters:
-        - $ref: "#/components/parameters/TripIdPathParam"
-        - $ref: "#/components/parameters/DayIdPathParam"
-        - $ref: "#/components/parameters/ActivityIdPathParam"
-      responses:
-        "200":
-          description: Activity deleted
-          content:
-            application/json:
-              schema:
-                $ref: "#/components/schemas/ActivityResponse"
-        "400":
-          $ref: "#/components/responses/ValidationError"
-        "401":
-          description: Unauthorized or not a trip member
-          content:
-            application/json:
-              schema:
-                oneOf:
-                  - $ref: "#/components/schemas/UnauthorizedErrorBody"
-                  - $ref: "#/components/schemas/CustomErrorBody"
-        "404":
-          description: Trip or day not found
-          content:
-            application/json:
-              schema:
-                $ref: "#/components/schemas/CustomErrorBody"
-        "500":
-          $ref: "#/components/responses/InternalServerError"
+         **Event Format**:
+         ```
+         event: tripDayUpdated
+         data: { ...trip day object with all activities... }
+         ```
+       parameters:
+         - $ref: "#/components/parameters/TripIdPathParam"
+         - $ref: "#/components/parameters/DayIdAsIdPathParam"
+       responses:
+         "200":
+           description: SSE stream established
+           headers:
+             Content-Type:
+               schema:
+                 type: string
+                 example: "text/event-stream"
+             Cache-Control:
+               schema:
+                 type: string
+                 example: "no-cache"
+             Connection:
+               schema:
+                 type: string
+                 example: "keep-alive"
+           content:
+             text/event-stream:
+               schema:
+                 type: object
+                 example:
+                   event: "tripDayUpdated"
+                   data: { id: "880e8400-e29b-41d4-a716-446655440333", date: "2026-06-01T00:00:00Z", tripId: "550e8400-e29b-41d4-a716-446655440000", activities: [] }
+         "401":
+           description: Unauthorized or not a trip member
+           content:
+             application/json:
+               schema:
+                 oneOf:
+                   - $ref: "#/components/schemas/UnauthorizedErrorBody"
+                   - $ref: "#/components/schemas/CustomErrorBody"
+         "500":
+           $ref: "#/components/responses/InternalServerError"
+
+   /{tripId}/days/{dayId}/activities/update-activities:
+     post:
+       tags: [Activities]
+       summary: Create and/or update activities for a trip day
+       operationId: updateActivities
+       description: |
+         Create new activities or update existing ones for a specific trip day.
+
+         - To create a new activity, omit the `activityId` field
+         - To update an existing activity, include its `activityId`
+         - Both creation and update can be mixed in a single request
+         - Notifications will be sent to all connected SSE clients except the user making the change
+       parameters:
+         - $ref: "#/components/parameters/TripIdPathParam"
+         - $ref: "#/components/parameters/DayIdPathParam"
+       requestBody:
+         required: true
+         content:
+           application/json:
+             schema:
+               $ref: "#/components/schemas/UpdateActivitiesRequest"
+       responses:
+         "200":
+           description: Activities update summary
+           content:
+             application/json:
+               schema:
+                 $ref: "#/components/schemas/UpdateActivitiesResponse"
+         "400":
+           $ref: "#/components/responses/ValidationError"
+         "401":
+           description: Unauthorized or not a trip member
+           content:
+             application/json:
+               schema:
+                 oneOf:
+                   - $ref: "#/components/schemas/UnauthorizedErrorBody"
+                   - $ref: "#/components/schemas/CustomErrorBody"
+         "404":
+           description: Trip or day not found
+           content:
+             application/json:
+               schema:
+                 $ref: "#/components/schemas/CustomErrorBody"
+         "500":
+           $ref: "#/components/responses/InternalServerError"
+
+   /{tripId}/days/{dayId}/activities/upsert-activity:
+     post:
+       tags: [Activities]
+       summary: Create or update a single activity
+       operationId: upsertActivity
+       description: |
+         Create a new activity or update an existing one for a specific trip day.
+
+         - If `activityId` is included in the request body, it will update that activity
+         - If `activityId` is omitted, a new activity will be created
+         - The activity will be assigned to the specified trip day based on its startTime/endTime
+         - Real-time notifications will be sent to SSE listeners except the user making the change
+       parameters:
+         - $ref: "#/components/parameters/TripIdPathParam"
+         - $ref: "#/components/parameters/DayIdPathParam"
+       requestBody:
+         required: true
+         content:
+           application/json:
+             schema:
+               $ref: "#/components/schemas/ActivityUpsert"
+       responses:
+         "200":
+           description: Activity successfully created or updated
+           content:
+             application/json:
+               schema:
+                 $ref: "#/components/schemas/ActivityResponse"
+         "400":
+           $ref: "#/components/responses/ValidationError"
+         "401":
+           description: Unauthorized or not a trip member
+           content:
+             application/json:
+               schema:
+                 oneOf:
+                   - $ref: "#/components/schemas/UnauthorizedErrorBody"
+                   - $ref: "#/components/schemas/CustomErrorBody"
+         "404":
+           description: Trip or day not found
+           content:
+             application/json:
+               schema:
+                 $ref: "#/components/schemas/CustomErrorBody"
+         "500":
+           $ref: "#/components/responses/InternalServerError"
+
+   /{tripId}/days/{dayId}/activities/{activityId}/delete-activity:
+     delete:
+       tags: [Activities]
+       summary: Delete an activity from a trip day
+       operationId: deleteActivity
+       description: Deletes a specific activity from a trip day. Only trip members can delete activities. Real-time notifications will be sent to other SSE listeners.
+       parameters:
+         - $ref: "#/components/parameters/TripIdPathParam"
+         - $ref: "#/components/parameters/DayIdPathParam"
+         - $ref: "#/components/parameters/ActivityIdPathParam"
+       responses:
+         "200":
+           description: Activity deleted
+           content:
+             application/json:
+               schema:
+                 $ref: "#/components/schemas/ActivityResponse"
+         "400":
+           $ref: "#/components/responses/ValidationError"
+         "401":
+           description: Unauthorized or not a trip member
+           content:
+             application/json:
+               schema:
+                 oneOf:
+                   - $ref: "#/components/schemas/UnauthorizedErrorBody"
+                   - $ref: "#/components/schemas/CustomErrorBody"
+         "404":
+           description: Trip or day not found
+           content:
+             application/json:
+               schema:
+                 $ref: "#/components/schemas/CustomErrorBody"
+         "500":
+           $ref: "#/components/responses/InternalServerError"
+
+   /{tripId}/days/{dayId}/activities/{activityId}/stream:
+     get:
+       tags: [Activities]
+       summary: Stream real-time updates for a single activity
+       operationId: streamActivity
+       description: |
+         Establishes a Server-Sent Events (SSE) connection to receive real-time updates
+         when a specific activity is modified. The connection will send JSON events whenever
+         any property of the activity changes.
+
+         **Note**: The user who makes the changes will NOT receive the update notification.
+
+         **Event Format**:
+         ```
+         event: activityUpdated
+         data: { ...activity object... }
+         ```
+       parameters:
+         - $ref: "#/components/parameters/TripIdPathParam"
+         - $ref: "#/components/parameters/DayIdPathParam"
+         - $ref: "#/components/parameters/ActivityIdPathParam"
+       responses:
+         "200":
+           description: SSE stream established
+           headers:
+             Content-Type:
+               schema:
+                 type: string
+                 example: "text/event-stream"
+             Cache-Control:
+               schema:
+                 type: string
+                 example: "no-cache"
+             Connection:
+               schema:
+                 type: string
+                 example: "keep-alive"
+           content:
+             text/event-stream:
+               schema:
+                 type: object
+                 example:
+                   event: "activityUpdated"
+                   data: { id: "770e8400-e29b-41d4-a716-446655440222", title: "Eiffel Tower Visit", startTime: "2026-06-01T18:00:00Z", endTime: "2026-06-01T21:00:00Z", tripId: "550e8400-e29b-41d4-a716-446655440000", tripDayId: "880e8400-e29b-41d4-a716-446655440333" }
+         "400":
+           $ref: "#/components/responses/ValidationError"
+         "401":
+           description: Unauthorized or not a trip member
+           content:
+             application/json:
+               schema:
+                 oneOf:
+                   - $ref: "#/components/schemas/UnauthorizedErrorBody"
+                   - $ref: "#/components/schemas/CustomErrorBody"
+         "500":
+           $ref: "#/components/responses/InternalServerError"
 
 components:
   securitySchemes:
