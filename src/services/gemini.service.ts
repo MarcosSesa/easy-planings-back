@@ -1,3 +1,5 @@
+// noinspection LanguageDetectionInspection
+
 import {GoogleGenAI} from "@google/genai";
 import {CreateTripData} from "src/types/trip.types";
 import {createTrip} from "src/services/domain/trip.service";
@@ -19,8 +21,10 @@ const activitiesSchema = array(activitySchema);
 
 export async function generateTrip(tripData: CreateTripData, userId: string) {
 
+    // Step 1: Create trip in database with auto-generated trip days
     const createdTrip = await createTrip(tripData, userId);
 
+    // Step 2: Build structured prompt for Gemini AI with trip details and constraints
     const prompt = `
         Genera exactamente entre 5 y 8 actividades por cada día de un viaje a ${createdTrip.title} desde ${createdTrip.startDate} hasta ${createdTrip.endDate}.
         
@@ -42,6 +46,7 @@ export async function generateTrip(tripData: CreateTripData, userId: string) {
         La respuesta debe estar completamente en español.
     `;
 
+    // Step 3: Call Gemini API with structured JSON output using Zod schema validation
     const response = await ai.models.generateContent({
         model: "gemini-3-flash-preview",
         contents: prompt,
@@ -51,19 +56,23 @@ export async function generateTrip(tripData: CreateTripData, userId: string) {
         },
     });
 
+    // Step 4: Parse and validate response against activity schema
     const activities = activitiesSchema.parse(JSON.parse(response.text ?? ''));
 
+    // Step 5: Fetch all trip days for the created trip from database
     const tripDays = await prismaService.tripDay.findMany({
         where: {tripId: createdTrip.id},
         select: {id: true, date: true}
     });
 
+    // Step 6: Map trip day dates (YYYY-MM-DD) to their IDs for quick lookup
     const dateToTripDayId = new Map<string, string>();
     tripDays.forEach(day => {
         const dateKey = day.date.toISOString().split('T')[0]; // YYYY-MM-DD
         dateToTripDayId.set(dateKey, day.id);
     });
 
+    // Step 7: Create activities in database, matching each to its corresponding trip day by date
     for (const activity of activities) {
         const activityDate = new Date(activity.startTime).toISOString().split('T')[0];
         const tripDayId = dateToTripDayId.get(activityDate);
@@ -79,5 +88,6 @@ export async function generateTrip(tripData: CreateTripData, userId: string) {
         }
     }
 
+    // Step 8: Return created trip with all auto-generated activities assigned to trip days
     return createdTrip;
 }
