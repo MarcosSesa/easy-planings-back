@@ -17,7 +17,10 @@ const app = express();
 app.use(express.json());
 app.use(cors({
     origin: 'https://easyplannings.marcossesa.com',
+    methods: ['GET', 'POST', 'PUT', 'DELETE', 'PATCH', 'OPTIONS'],
     allowedHeaders: ['Authorization', 'Content-Type'],
+    credentials: true,
+    maxAge: 86400
 }));
 
 app.use("/auth", authRouter);
