@@ -18,7 +18,6 @@ app.use(express.json());
 app.use(cors({
     origin: 'https://easyplannings.marcossesa.com',
     allowedHeaders: ['Authorization', 'Content-Type'],
-    credentials: true
 }));
 
 app.use("/auth", authRouter);
