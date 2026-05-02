@@ -7,7 +7,7 @@
   "scripts": {
     "dev": "tsx watch src/app.ts",
     "start": "node dist/app.js",
-    "build": "tsc"
+    "build": "pkgroll ."
   },
   "repository": {
     "type": "git",
