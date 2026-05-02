@@ -6,7 +6,8 @@
   "main": "index.js",
   "scripts": {
     "dev": "tsx watch src/app.ts",
-    "start": "node dist/app.js"
+    "start": "node dist/app.js",
+    "build": "tsc"
   },
   "repository": {
     "type": "git",
@@ -20,6 +21,7 @@
   },
   "homepage": "https://github.com/MarcosSesa/easy-planings-back#readme",
   "devDependencies": {
+    "@modelcontextprotocol/sdk": "^1.29.0",
     "@types/bcrypt": "^6.0.0",
     "@types/cors": "^2.8.19",
     "@types/express": "^5.0.6",

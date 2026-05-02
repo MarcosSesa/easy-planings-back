@@ -5,14 +5,15 @@
     "target": "ES2023",
     "strict": true,
     "esModuleInterop": true,
+    "skipLibCheck": true,
     "baseUrl": ".",
     "outDir": "./dist",
-    "rootDir": "./src",
+    "rootDir": ".",
     "paths": {
       "src/*": ["src/*"]
     },
     "typeRoots": ["./node_modules/@types", "./src/types"]
   },
-  "include": ["src/**/*"],
+  "include": ["src/**/*", "generated/**/*"],
   "exclude": ["node_modules", "dist"]
 }
