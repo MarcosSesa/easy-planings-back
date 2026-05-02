@@ -9,7 +9,7 @@ COPY ./src /usr/local/app/src
 COPY ./prisma /usr/local/app/prisma
 
 RUN npm install
-RUN npx tsc
+RUN npx tsc --outDir dist
 
 FROM node:lts
 
