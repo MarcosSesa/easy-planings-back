@@ -2,26 +2,19 @@ FROM node:lts AS build
 
 WORKDIR /usr/local/app
 
-COPY ./package.json /usr/local/app/
-COPY ./package-lock.json /usr/local/app/
-COPY ./src /usr/local/app/src
-
-COPY ./prisma /usr/local/app/prisma
-COPY ./prisma.config.ts /usr/local/app/
-
+COPY package*.json ./
 RUN npm install
+
+COPY . .
 RUN npm run build
+
 
 FROM node:lts
 
 WORKDIR /usr/local/app
-COPY --from=build /usr/local/app/node_modules /usr/local/app/node_modules
-COPY --from=build /usr/local/app/dist /usr/local/app/dist
-COPY --from=build /usr/local/app/prisma /usr/local/app/prisma
-COPY --from=build /usr/local/app/prisma.config.ts /usr/local/app/prisma.config.ts
 
-RUN npx prisma generate
+COPY --from=build /usr/local/app ./
 
 EXPOSE 8080
 
-CMD npx prisma migrate deploy && node dist/index.mjs
+CMD ["sh", "-c", "npx prisma generate && npx prisma migrate deploy && node dist/index.mjs"]
